@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>المسبحة</title>
+<style>
+:root{--bg:#0a0a0b;--ink:#eee;--mute:#8a8a90;--good:#3fae5a;--bad:#c23b3b;--red:#d1262b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Tajawal","Segoe UI",Tahoma,sans-serif;overflow:hidden;user-select:none;touch-action:manipulation}
+#app{height:100%;display:flex;flex-direction:column}
+.bar{display:flex;gap:8px;padding:12px;justify-content:center;flex-wrap:wrap}
+.bar button,.foot button{background:#17171a;color:var(--mute);border:1px solid #2a2a2f;border-radius:20px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer}
+.bar button.on{color:var(--ink);border-color:var(--ink)}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.score{display:flex;justify-content:space-between;padding:4px 22px;font-weight:700;font-size:18px}
+.score small{display:block;font-size:13px}
+.g{color:var(--good)}.b{color:var(--bad)}
+#stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer}
+#beads{display:none;width:100%}
+.count{position:absolute;top:8%;right:6%;direction:ltr;font-size:54px;font-weight:300;line-height:1}
+.count span{font-size:28px;color:var(--mute)}
+.count em{display:block;font-style:normal;font-size:15px;color:var(--mute);margin-top:6px}
+.strip{position:relative;height:90px;overflow:hidden;direction:ltr}
+.strip:before{content:"";position:absolute;left:0;right:0;top:45px;height:2px;background:#2b2b30}
+#track{position:absolute;top:0;left:-84px;display:flex;gap:20px;will-change:transform}
+.bead{flex:none;width:64px;height:64px;margin-top:13px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#8d8d93,#2a2a2e 55%,#0e0e10)}
+#arc{display:none;width:100%;height:100%;max-width:420px}
+#arc{touch-action:none}
+#arc .box{fill:none;stroke:#3a1416;rx:8}
+.num{font:300 44px/1 ui-monospace,Menlo,monospace;fill:var(--ink)}
+.dh{font-size:22px;font-weight:700;fill:var(--ink)}
+.mode-arc #beads{display:none!important}
+.mode-arc #arc{display:block}
+.mode-arc .count{display:none}
+.mode-beads #beads{display:block}
+.plus{position:absolute;left:50%;top:38%;color:var(--ink);font-size:20px;pointer-events:none;animation:up .7s ease-out forwards}
+@keyframes up{to{transform:translateY(-60px);opacity:0}}
+.hint{position:absolute;bottom:12px;width:100%;text-align:center;color:var(--mute);font-size:13px;pointer-events:none}
+.foot{display:flex;justify-content:center;padding:10px}
+@media(prefers-reduced-motion:reduce){.plus{animation:none;opacity:0}}
+</style>
+</head>
+<body>
+<div id="app" class="mode-beads">
+  <div class="bar" id="modes">
+    <button data-m="beads" class="on">مسبحة</button>
+    <button data-m="arc">قوس</button>
+  </div>
+  <div class="bar" id="dhikrs"></div>
+  <div class="score">
+    <div class="g"><small>الحسنة</small><span id="good">0</span></div>
+    <div class="b"><small>السيئة</small><span id="bad">1000</span></div>
+  </div>
+  <div id="stage">
+    <div class="count" id="cnt"><b id="n">0</b><span>/33</span><em id="tours">Tours: 0</em></div>
+    <div id="beads"><div class="strip"><div id="track"></div></div></div>
+    <svg id="arc" viewBox="0 0 300 440" aria-label="عداد">
+      <rect class="box" x="115" y="90" width="70" height="56" rx="8"/>
+      <text class="dh" id="dhText" x="150" y="62" text-anchor="middle"></text>
+      <text class="num" id="num" x="150" y="132" text-anchor="middle">0</text>
+      <path id="p" d="M262 60 C130 72 62 170 52 350" fill="none" stroke="#3a3a40" stroke-width="1.5"/>
+      <text x="150" y="250" text-anchor="middle" font-size="26">❤️</text>
+      <rect x="40" y="350" width="22" height="34" rx="6" fill="#7a1417"/>
+      <rect x="40" y="388" width="22" height="34" rx="6" fill="#7a1417"/>
+      <rect id="dot" x="-11" y="-17" width="22" height="34" rx="6" fill="var(--red)"/>
+    </svg>
+    <div class="hint" id="hint">المس الشاشة للعدّ</div>
+  </div>
+  <div class="foot"><button id="reset">تصفير</button></div>
+</div>
+<script>
+var D=["سبحان الله","الحمد لله","الله أكبر","أستغفر الله","لا إله إلا الله"];
+var S={m:"beads",d:3,t:0,good:0,bad:1000};
+try{var x=JSON.parse(localStorage.getItem("masbaha")||"null");if(x)S=x}catch(e){}
+var $=function(i){return document.getElementById(i)};
+var app=$("app"),track=$("track"),p=$("p"),dot=$("dot"),busy=false;
+for(var i=0;i<9;i++){var b=document.createElement("div");b.className="bead";track.appendChild(b)}
+D.forEach(function(t,i){var b=document.createElement("button");b.textContent=t;b.dataset.d=i;$("dhikrs").appendChild(b)});
+function save(){try{localStorage.setItem("masbaha",JSON.stringify(S))}catch(e){}}
+function place(f){var L=p.getTotalLength(),pt=p.getPointAtLength(L*f);dot.setAttribute("transform","translate("+pt.x+","+pt.y+")")}
+function render(){
+  app.className="mode-"+S.m;
+  [].forEach.call($("modes").children,function(b){b.classList.toggle("on",b.dataset.m===S.m)});
+  [].forEach.call($("dhikrs").children,function(b){b.classList.toggle("on",+b.dataset.d===S.d)});
+  var r=S.t%33||(S.t?33:0);
+  $("n").textContent=r;$("tours").textContent="Tours: "+Math.floor((S.t-(S.t?1:0))/33);
+  $("num").textContent=S.t;$("dhText").textContent=D[S.d];
+  $("good").textContent=S.good;$("bad").textContent=S.bad;
+  if(S.m==="arc")place(0);$("hint").textContent=S.m==="arc"?"اسحب الخرزة الحمرا من فوق للأسفل":"المس الشاشة للعدّ";
+}
+function plus(){var e=document.createElement("div");e.className="plus";e.textContent="+1";$("stage").appendChild(e);setTimeout(function(){e.remove()},700)}
+function tap(){
+  if(busy&&S.m==="arc")return;
+  S.t++;
+  if(S.t%33===0){S.good+=100;S.bad=Math.max(0,S.bad-100)}
+  if(navigator.vibrate)try{navigator.vibrate(12)}catch(e){}
+  plus();
+  var rm=window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+  if(S.m==="beads"&&!rm){
+    track.style.transition="transform .16s";track.style.transform="translateX(84px)";
+    setTimeout(function(){track.style.transition="none";track.style.transform="none"},170);
+  }else if(false){
+    busy=true;var t0=performance.now();
+    (function f(t){var k=Math.min(1,(t-t0)/260);place(k);if(k<1)requestAnimationFrame(f);else{busy=false;place(0)}})(t0);
+  }
+  save();render();
+}
+$("stage").addEventListener("click",function(){if(S.m!=="arc")tap()});
+$("modes").addEventListener("click",function(e){if(e.target.dataset.m){S.m=e.target.dataset.m;save();render()}});
+$("dhikrs").addEventListener("click",function(e){if(e.target.dataset.d){S.d=+e.target.dataset.d;save();render()}});
+$("reset").addEventListener("click",function(){S.t=0;S.good=0;S.bad=1000;save();render()});
+var svg=$("arc"),pts=[],drag=false,cur=0,N=80;
+(function(){var L=p.getTotalLength();for(var i=0;i<=N;i++){var q=p.getPointAtLength(L*i/N);pts.push([q.x,q.y])}})();
+function svgPt(e){var s=svg.createSVGPoint();s.x=e.clientX;s.y=e.clientY;var m=svg.getScreenCTM();return m?s.matrixTransform(m.inverse()):s}
+function near(q,lo,hi){var best=lo,bd=1e9;for(var i=lo;i<=hi;i++){var dx=pts[i][0]-q.x,dy=pts[i][1]-q.y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=i}}return best}
+function slideBack(){var from=cur,t0=performance.now();cur=0;(function f(t){var k=Math.min(1,(t-t0)/200);place(from/N*(1-k));if(k<1&&!drag)requestAnimationFrame(f);else if(!drag)place(0)})(t0)}
+svg.addEventListener("pointerdown",function(e){if(S.m!=="arc")return;var q=svgPt(e),c=pts[cur];if(Math.hypot(c[0]-q.x,c[1]-q.y)>60)return;drag=true;try{svg.setPointerCapture(e.pointerId)}catch(x){}e.preventDefault()});
+svg.addEventListener("pointermove",function(e){if(!drag)return;cur=near(svgPt(e),Math.max(0,cur-20),Math.min(N,cur+20));place(cur/N);if(cur>=N-4){drag=false;cur=0;tap()}});
+function up(){if(drag){drag=false;slideBack()}}
+svg.addEventListener("pointerup",up);svg.addEventListener("pointercancel",up);
+render();
+</script>
+</body>
+</html>
